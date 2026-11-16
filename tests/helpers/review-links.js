@@ -1,0 +1,40 @@
+// One list, checked against both implementations of the review-link rule:
+// lib/validation.js (JavaScript) and public.is_valid_review_url (SQL).
+export const VALID_REVIEW_LINKS = [
+  'https://g.page/r/CQ1a2b3c4d5e6f7g/review',
+  'https://g.page/kopi-corner',
+  'https://search.google.com/local/writereview?placeid=ChIJEXAMPLEPLACEID0000',
+  'https://maps.app.goo.gl/AbCdEfGh12345',
+  'https://www.google.com/maps/place/Kopi+Corner/@3.139,101.686,17z',
+  'https://google.com/maps?cid=1234567890',
+  'https://www.google.com.my/maps/place/Salon+Seri',
+  'https://www.google.com/search?q=kopi+corner#lrd=0x0:0x1,3',
+  'https://maps.google.com/?cid=1234567890',
+  'https://goo.gl/maps/AbCdEf123',
+  'https://g.co/kgs/AbC123',
+  'https://share.google/AbCdEf123456',
+  'https://G.PAGE/r/abc/review',
+];
+
+export const INVALID_REVIEW_LINKS = [
+  '',
+  'g.page/r/abc/review',
+  'http://g.page/r/abc/review',
+  'https://evil.example.com/g.page/r/abc/review',
+  'https://g.page.evil.com/r/abc',
+  'https://evilg.page/r/abc',
+  'https://user:pass@g.page/r/abc',
+  'https://g.page@evil.com/r/abc',
+  'https://g.page:8443/r/abc',
+  'https://www.google.com/url?q=https://evil.example.com',
+  'https://www.google.com/',
+  'https://accounts.google.com/signin',
+  'https://docs.google.com/forms/d/abc',
+  'https://goo.gl/abc123',
+  'https://g.co/abc',
+  'https://search.google.com/search-console',
+  'javascript:alert(1)',
+  'https://g.page/r/abc/review bad',
+  'https://www.facebook.com/kopicorner/reviews',
+  `https://g.page/${'a'.repeat(600)}`,
+];
