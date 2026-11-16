@@ -33,7 +33,6 @@ const env = {
   AIRWALLEX_PRICE_MONTHLY: 'pri_dev_month',
   AIRWALLEX_PRICE_YEARLY: 'pri_dev_year',
   AIRWALLEX_API_URL: 'http://127.0.0.1:9',
-  ...(process.env.SMOKE_GBP ? { GBP_ENABLED: 'true' } : {}),
 };
 
 let app;
@@ -81,6 +80,23 @@ async function main() {
 
   const checks = (await import('./app-smoke-checks.mjs')).default;
   await checks({ page, get, check, demo, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon, BASE, env });
+
+  // Same build, restarted with the Google features switched on.
+  if (!KEEP || process.env.SMOKE_GBP) {
+    app.kill('SIGKILL');
+    await sleep(500);
+    const gbpEnv = {
+      ...env, GBP_ENABLED: 'true', GOOGLE_CLIENT_ID: 'dev.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'dev-google-secret',
+      TOKEN_ENCRYPTION_KEY: 'a'.repeat(64), GOOGLE_PUBSUB_SERVICE_ACCOUNT: 'push@dev.iam.gserviceaccount.com', ANTHROPIC_API_KEY: 'dev-anthropic',
+    };
+    app = spawn(process.execPath, [NEXT_BIN, 'start', '-p', String(PORT)], { env: gbpEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+    app.stderr.on('data', (chunk) => { stderr += chunk; });
+    for (let i = 0; i < 60; i += 1) {
+      try { await fetch(`${BASE}/login`, { signal: AbortSignal.timeout(1000) }); break; } catch { await sleep(500); }
+    }
+    const googleChecks = (await import('./app-smoke-checks.mjs')).google;
+    await googleChecks({ page, get, check, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon, BASE, env: gbpEnv });
+  }
 
   if (stderr.trim()) console.log(`\nServer errors logged:\n${stderr.trim().split('\n').slice(0, 30).join('\n')}`);
   if (KEEP) {

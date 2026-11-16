@@ -2,7 +2,7 @@
 
 Mis à jour à chaque étape. Pour reprendre dans une nouvelle conversation : « reprends depuis PROGRESS.md ».
 
-Dernière mise à jour : 17 nov. 2026 — phases 1 à 5 livrées côté code. Suite : Google (6), finitions (7).
+Dernière mise à jour : 17 nov. 2026 — les 7 phases sont livrées côté code. Il reste des actions de ta part (migrations, variables, clés Airwallex, accès Google) : voir la fin du fichier.
 
 ## Où on en est
 
@@ -13,8 +13,8 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 à 5 livrées côté code. Su
 | 3 | Dashboard Pro (hors Google) | Livré |
 | 4 | Abonnement et paiement | Livré (adaptateur Airwallex prêt, en attente des clés) |
 | 5 | Admin | Livré |
-| 6 | Google Business Profile (`GBP_ENABLED`) | À faire |
-| 7 | Finitions et checklist | À faire |
+| 6 | Google Business Profile (GBP_ENABLED) | Livré, désactivé par défaut. À valider avec la vraie API quand Google donne l'accès |
+| 7 | Finitions et checklist | Livré |
 
 ## Phase 1 — ce qui est fait
 
@@ -62,6 +62,26 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 à 5 livrées côté code. Su
 - `/admin/plates`, `/admin/subscriptions`, `/admin/support`, `/admin/system` (quelles variables sont configurées, sans jamais afficher leur valeur ; derniers webhooks ; derniers emails).
 - Un non-admin est renvoyé vers son dashboard ; chaque fonction SQL revérifie le rôle admin.
 
+## Phase 6 — ce qui est fait (invisible tant que `GBP_ENABLED` n'est pas `true`)
+
+- **Connect Google** (`/dashboard/google`) : OAuth web, scope `business.manage` uniquement, retour sur `/api/google/callback` avec contrôle du `state`, jeton chiffré (AES-256-GCM, clé `TOKEN_ENCRYPTION_KEY`) dans une table illisible par l'API. Jamais de mot de passe Google.
+- **Choix des lieux** : le patron associe une fiche Google à chaque lieu Pro ; la fiche est revérifiée chez Google avant d'être liée.
+- **Avis** (`/dashboard/reviews`) : import via l'API v4, note moyenne, répartition, filtres (à répondre, répondu, 1 à 3 étoiles).
+- **Alertes** : Pub/Sub en push sur `/api/google/notifications`, jeton OIDC vérifié (signature Google, audience, compte de service) ; email au patron ; synchro de secours dans la tâche quotidienne.
+- **Brouillons IA** en anglais, malais, chinois (API Claude). Seuls la note, le texte de l'avis et le nom du commerce sont envoyés, pas le nom de l'auteur. Le patron modifie puis appuie sur « Approve and publish » : c'est le seul chemin vers `reviews.updateReply`. **Aucune publication automatique** (testé).
+- **Tendances des avis** dans le résumé mensuel, séparées des scans.
+- **Disconnect Google and delete data** : révoque l'accès chez Google et supprime jetons, fiches liées, avis et brouillons. Les données Google d'un lieu sont aussi supprimées 30 jours après la fin du Pro.
+- **`/privacy` et `/terms`** : pages publiques, liées depuis le pied de page du site.
+- **Script de la vidéo de démo** : `docs/google-oauth-demo-video.md`.
+
+Limite à connaître : le code Google et Airwallex suit la documentation publique et est couvert par des tests avec des réponses simulées, mais n'a jamais parlé aux vraies API (pas de clés). Prévoir une passe de validation à l'arrivée des accès.
+
+## Phase 7 — finitions
+
+- Next.js mis à jour en 16.4.6 (la version précédente était signalée comme vulnérable et bloquait le build).
+- Contrôle dans un vrai navigateur (largeur mobile 390 px) : pages principales sans défilement horizontal, formulaires réels soumis (lien Google, brouillon, création admin, Pro manuel, pause de plaque).
+- Deux liens du site modifiés : « Log in » pointe vers la vraie page `/login`, « Privacy » et « Terms » du pied de page vers `/privacy` et `/terms`. Rien d'autre n'a été touché sur le site.
+
 ## Migrations SQL
 
 Dans `supabase/migrations/`, à lancer dans l'ordre. Toutes sont idempotentes (relançables) et compatibles avec les plaques déjà programmées.
@@ -72,6 +92,7 @@ Dans `supabase/migrations/`, à lancer dans l'ordre. Toutes sont idempotentes (r
 | `0002_stats.sql` | statistiques en SQL, fuseau KL | Non |
 | `0003_owner_features.sql` | lien Google modifiable, compte, page de liens, support | Non |
 | `0004_billing_admin.sql` | paiements, webhooks, outils admin, maintenance | Non |
+| `0005_google.sql` | connexion Google, fiches liées, avis, brouillons (inutilisé tant que `GBP_ENABLED` est éteint) | Non |
 
 Sauvegarde avant migration : export complet des tables `plates`, `scans`, `admins` relu le 16 nov. 2026 (1 plaque, 5 scans, 1 admin), conservé dans le notebook Supabase « ReviewLah — table export before migration (read-only) ».
 
@@ -85,4 +106,13 @@ Sauvegarde avant migration : export complet des tables `plates`, `scans`, `admin
 
 ## Actions attendues de ta part
 
-(Complété au fil des phases. Liste finale en fin de projet.)
+1. **Appliquer les migrations** (priorité : tant que ce n'est pas fait, le dashboard affiche « We are updating your dashboard » ; la plaque, elle, redirige normalement). La demande de confirmation Supabase du 17 nov. est restée sans réponse. Deux façons :
+   - dire à Claude « applique les migrations » et accepter la confirmation Supabase qui s'affiche ;
+   - ou, dans Supabase > SQL Editor, lancer d'abord le notebook « ReviewLah — 00 backup before migration », puis coller et exécuter dans l'ordre `0001_core.sql`, `0002_stats.sql`, `0003_owner_features.sql`, `0004_billing_admin.sql`, `0005_google.sql`.
+2. **Créer les variables d'environnement** du bloc 1 de `docs/ENVIRONMENT.md` dans Vercel, puis redéployer.
+3. **Supabase > Authentication** : vérifier que `https://www.reviewlah.my/auth/callback` et `https://www.reviewlah.my/auth/confirm` sont dans les Redirect URLs, et que le modèle d'email « Magic Link » contient bien le code `{{ .Token }}` si tu veux la saisie du code à 6 chiffres.
+4. **Dérouler `docs/TEST-CHECKLIST.md`** (parties A à D) avec ta plaque.
+5. **Airwallex**, quand ils ont répondu : bloc 2 de `docs/ENVIRONMENT.md`, d'abord en sandbox, puis partie E de la checklist.
+6. **Google**, quand l'accès est accordé : bloc 3 de `docs/ENVIRONMENT.md`, vidéo (`docs/google-oauth-demo-video.md`), partie F de la checklist.
+7. **Faire relire `/privacy` et `/terms`** par un juriste et renseigner `LEGAL_ENTITY_NAME`, `LEGAL_ENTITY_ADDRESS`, `LEGAL_GOVERNING_LAW`. La loi PDPA demande aussi un avis en malais : à faire traduire.
+8. Le site affiche encore le bandeau « Private preview · Orders not open yet » et un tunnel de commande de démonstration : à ouvrir quand tu vends.

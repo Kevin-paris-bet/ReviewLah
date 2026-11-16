@@ -187,7 +187,7 @@ export default async function Billing({ searchParams }) {
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Date</th><th>Location</th><th>For</th><th className="n">Amount</th><th>Status</th><th><span className="sr">Invoice</span></th></tr></thead>
+                <thead><tr><th>Date</th><th>Location</th><th>For</th><th className="n">Amount</th><th>Status</th><th aria-label="Invoice" /></tr></thead>
                 <tbody>
                   {payments.map((p) => {
                     const [label, cls] = PAYMENT_STATUS[p.status] || [p.status, 'plain'];

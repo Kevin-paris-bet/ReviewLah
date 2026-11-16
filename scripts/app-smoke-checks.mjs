@@ -121,4 +121,45 @@ export default async function checks({ page, get, check, supabase, owner, other,
   c = await fetch(`${BASE}/api/cron/daily`, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
   const cron = await c.json().catch(() => ({}));
   check('the daily job runs with the secret', c.status === 200 && cron.ok === true && cron.maintenance && !cron.maintenance.error, `${c.status} ${JSON.stringify(cron)}`);
+
+  // Google features are off by default
+  r = await get('/dashboard/reviews', owner);
+  check('Reviews page does not exist while GBP_ENABLED is off', r.status === 404, `status ${r.status}`);
+  r = await get('/dashboard/google', owner);
+  check('Google connection page does not exist while GBP_ENABLED is off', r.status === 404, `status ${r.status}`);
+  let g = await fetch(`${BASE}/api/google/notifications`, { method: 'POST', body: '{}' });
+  check('Pub/Sub endpoint is closed while GBP_ENABLED is off', g.status === 404, `status ${g.status}`);
+  g = await fetch(`${BASE}/api/google/callback?code=x&state=y`, { redirect: 'manual' });
+  check('OAuth callback is closed while GBP_ENABLED is off', g.status === 404, `status ${g.status}`);
+  await page('overview has no Reviews tab while GBP_ENABLED is off', '/dashboard', owner, ['Analytics'], ['/dashboard/reviews']);
+
+  // Legal pages (public)
+  await page('privacy policy', '/privacy', null, ['Privacy policy', 'https://www.googleapis.com/auth/business.manage', 'Limited Use', 'Personal Data Protection Act 2010', 'Disconnect Google and delete data', 'does not use it to train its models']);
+  await page('terms of service', '/terms', null, ['Terms of service', 'Scans are not reviews', 'review gating', 'Your plate and your Basic dashboard keep working']);
+}
+
+// Run against the same app restarted with GBP_ENABLED=true.
+export async function google({ page, get, check, supabase, owner, other, bangsar, ttdi, BASE }) {
+  await page('overview shows the Reviews tab', '/dashboard', owner, ['/dashboard/reviews']);
+  await page('Google connection page: connected, linked listing, delete button', '/dashboard/google', owner,
+    ['Google is connected', 'Aisha Rahman', 'Kopi Corner Bangsar', 'Jalan Telawi 3', 'Refresh now', 'Disconnect Google and delete data', 'Reviews and reply drafts are part of Pro'], ['v1.demo']);
+  await page('Google connection page: not connected yet', '/dashboard/google', other,
+    ['Connect your Google Business Profile', 'never sees your Google password', 'Connect Google', 'Nothing is ever posted automatically']);
+  await page('reviews inbox', `/dashboard/reviews?location=${bangsar.business_id}`, owner,
+    ['Mei Ling Tan', 'Waited 40 minutes', 'Average rating', 'Approve and publish on Google', 'Save draft', 'written by AI in English', 'We are sorry about the wait on Saturday', 'Bahasa Malaysia', '中文', 'Your reply', 'Terima kasih Siti!', 'Rating only, no text']);
+  await page('reviews inbox: to reply only', `/dashboard/reviews?location=${bangsar.business_id}&filter=unreplied`, owner, ['Mei Ling Tan', 'Farid Hakim'], ['Daniel Wong']);
+  await page('reviews for a Basic location show the Pro screen', `/dashboard/reviews?location=${ttdi.business_id}`, owner, ['See new Google reviews and reply faster'], ['Mei Ling Tan']);
+  await page('another customer sees none of these reviews', '/dashboard/reviews', other, [], ['Mei Ling Tan', 'Farid Hakim']);
+  const before = (await supabase.db.query('select count(*)::int as n from public.google_reviews where reply_comment is not null')).rows[0].n;
+  check('opening the pages published nothing: replies unchanged, draft still a draft', before === 2
+    && (await supabase.db.query('select count(*)::int as n from public.review_reply_drafts')).rows[0].n === 1, `replies ${before}`);
+
+  let g = await fetch(`${BASE}/api/google/notifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: { data: 'e30=' } }) });
+  check('Pub/Sub push without a Google token is refused', g.status === 401, `status ${g.status}`);
+  g = await fetch(`${BASE}/api/google/notifications`, { method: 'POST', headers: { authorization: 'Bearer aaa.bbb.ccc' }, body: '{}' });
+  check('Pub/Sub push with a forged token is refused', g.status === 401, `status ${g.status}`);
+  let r = await get('/api/google/callback?code=abc&state=forged', owner);
+  check('OAuth return with a forged state is refused', r.status === 307 && r.location.includes('error=google_state'), `${r.status} ${r.location}`);
+  r = await get('/api/google/callback?code=abc&state=x', null);
+  check('OAuth return without a session goes to the login page', r.status === 307 && r.location.includes('/login'), `${r.status} ${r.location}`);
 }

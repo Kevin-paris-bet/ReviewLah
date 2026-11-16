@@ -293,6 +293,26 @@ export async function seedDemo(db) {
   await runAs(db, { role: 'authenticated', claims: { sub: other.id, email: other.email, role: 'authenticated' } },
     (tx) => tx.query("select public.create_support_request('Plate support', 'My plate opens the page on Android but not on my iPhone 8.')"));
 
+  // Google Business Profile demo data (only visible when GBP_ENABLED=true).
+  const service = (text, params) => runAs(db, { role: 'service_role', claims: { role: 'service_role' } }, (tx) => tx.query(text, params));
+  await service('select public.google_save_connection($1, $2, $3, $4, $5)', [bangsar.company_id, owner.id, 'Aisha Rahman', 'v1.demo.demo.demo', 'https://www.googleapis.com/auth/business.manage']);
+  await service('select public.google_link_location($1, $2, $3, $4, $5, $6)', [bangsar.business_id, 'accounts/100', 'locations/200', 'Kopi Corner Bangsar', 'Jalan Telawi 3, Kuala Lumpur', 'ChIJdemo']);
+  const ago = (d) => new Date(Date.now() - d * 86400000).toISOString();
+  const demoReview = (id, name, rating, comment, days, reply = null) => ({
+    review_id: id, resource_name: `accounts/100/locations/200/reviews/${id}`, reviewer_name: name, rating, comment,
+    create_time: ago(days), update_time: ago(days), reply_comment: reply, reply_update_time: reply ? ago(days - 0.5) : null,
+  });
+  await service('select public.google_upsert_reviews($1, $2::jsonb, true, 4.4, 6)', [bangsar.business_id, JSON.stringify([
+    demoReview('g1', 'Mei Ling Tan', 5, 'Best kopi in Bangsar, and the kaya toast is perfect.', 1),
+    demoReview('g2', 'Farid Hakim', 2, 'Waited 40 minutes for two drinks on Saturday.', 2),
+    demoReview('g3', 'Priya N.', 4, null, 6),
+    demoReview('g4', 'Daniel Wong', 5, 'Friendly staff, will come back.', 12, 'Thank you Daniel, see you soon!'),
+    demoReview('g5', 'Siti Aminah', 5, 'Sedap! Suasana pun selesa.', 20, 'Terima kasih Siti!'),
+    demoReview('g6', 'Anonymous', 3, 'Good coffee but parking is difficult.', 35),
+  ])]);
+  await runAs(db, { role: 'authenticated', claims: { sub: owner.id, email: owner.email, role: 'authenticated' } },
+    (tx) => tx.query("select public.save_reply_draft((select id from public.google_reviews where review_id = 'g2'), 'We are sorry about the wait on Saturday. Please contact us so we can put it right.', 'en', 'ai', 'claude-haiku-5-5')"));
+
   return { admin, owner, other, newcomer, bangsar, ttdi, salon };
 }
 

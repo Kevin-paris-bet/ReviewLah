@@ -21,6 +21,12 @@ const AUDIT = {
   'subscription.superseded': 'Subscription replaced',
   'plate.moved': 'Plate moved',
   'plate.deleted': 'Plate deleted',
+  'google.connected': 'Google connected',
+  'google.disconnected': 'Google disconnected, imported data deleted',
+  'google.linked': 'Google listing linked',
+  'google.unlinked': 'Google listing unlinked',
+  'review.reply_published': 'Review reply published',
+  'review.reply_deleted': 'Review reply deleted',
 };
 
 function Plan({ company, b }) {
@@ -292,7 +298,7 @@ export default async function Customer({ params, searchParams }) {
         {payments.length === 0 ? <p className="muted">No online payment yet.</p> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Date</th><th>Location</th><th className="n">Amount</th><th>Status</th><th>Provider</th><th><span className="sr">Invoice</span></th></tr></thead>
+              <thead><tr><th>Date</th><th>Location</th><th className="n">Amount</th><th>Status</th><th>Provider</th><th aria-label="Invoice" /></tr></thead>
               <tbody>
                 {payments.map((p) => (
                   <tr key={p.id}>

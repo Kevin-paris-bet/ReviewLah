@@ -81,6 +81,7 @@ export default async function Account({ searchParams }) {
         <div className="row">
           <a className="btn out small" href="/dashboard/help">Help and contact</a>
           <a className="btn out small" href="/dashboard/billing">Plan and payments</a>
+          {google && <a className="btn out small" href="/dashboard/google">Google connection</a>}
           <a className="btn out small" href="/privacy">Privacy</a>
           <a className="btn out small" href="/terms">Terms</a>
           <form action={signOut}><button className="btn danger small" type="submit">Log out</button></form>
