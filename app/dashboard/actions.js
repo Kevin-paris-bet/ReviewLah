@@ -8,19 +8,7 @@ import { errorCode } from '../../lib/dashboard';
 import { validateReviewUrl, isValidPhone, isValidEmail, isUuid, normalizeLinks } from '../../lib/validation';
 import { siteUrl } from '../../lib/env';
 import { notifySupport } from '../../lib/email/send';
-
-async function session() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data?.user) redirect('/login');
-  return { supabase, user: data.user };
-}
-
-function go(path, kind, code) {
-  redirect(`${path}${path.includes('?') ? '&' : '?'}${kind}=${encodeURIComponent(code)}`);
-}
-
-const text = (formData, name, max = 500) => String(formData.get(name) ?? '').trim().slice(0, max);
+import { session, go, text } from '../../lib/action-helpers';
 
 export async function signOut() {
   const supabase = await createClient();

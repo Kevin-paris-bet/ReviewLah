@@ -26,6 +26,13 @@ const env = {
   SUPPORT_EMAIL: 'hello@reviewlah.my',
   SUPPORT_WHATSAPP: '+60 11-1234 5678',
   NEXT_TELEMETRY_DISABLED: '1',
+  PAYMENT_PROVIDER: 'airwallex',
+  AIRWALLEX_CLIENT_ID: 'dev-client',
+  AIRWALLEX_API_KEY: 'dev-key',
+  AIRWALLEX_WEBHOOK_SECRET: 'dev-webhook-secret',
+  AIRWALLEX_PRICE_MONTHLY: 'pri_dev_month',
+  AIRWALLEX_PRICE_YEARLY: 'pri_dev_year',
+  AIRWALLEX_API_URL: 'http://127.0.0.1:9',
   ...(process.env.SMOKE_GBP ? { GBP_ENABLED: 'true' } : {}),
 };
 
@@ -73,7 +80,7 @@ async function main() {
   const { owner, other, newcomer, admin, bangsar, ttdi, salon } = demo;
 
   const checks = (await import('./app-smoke-checks.mjs')).default;
-  await checks({ page, get, check, demo, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon, BASE });
+  await checks({ page, get, check, demo, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon, BASE, env });
 
   if (stderr.trim()) console.log(`\nServer errors logged:\n${stderr.trim().split('\n').slice(0, 30).join('\n')}`);
   if (KEEP) {

@@ -2,7 +2,7 @@
 
 Mis à jour à chaque étape. Pour reprendre dans une nouvelle conversation : « reprends depuis PROGRESS.md ».
 
-Dernière mise à jour : 17 nov. 2026 — phases 1 et 2 livrées, phase 3 presque finie (reste le résumé mensuel par email).
+Dernière mise à jour : 17 nov. 2026 — phases 1 à 4 livrées côté code. Suite : admin (5), Google (6), finitions (7).
 
 ## Où on en est
 
@@ -10,8 +10,8 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 et 2 livrées, phase 3 presqu
 | --- | --- | --- |
 | 1 | Données et performances | Code livré. Migrations 0001–0004 à appliquer en production |
 | 2 | Dashboard Basic | Livré |
-| 3 | Dashboard Pro (hors Google) | Analytics, comparaison, page de liens, export CSV livrés. Reste : résumé mensuel par email |
-| 4 | Abonnement et paiement | SQL prêt, interface à faire |
+| 3 | Dashboard Pro (hors Google) | Livré |
+| 4 | Abonnement et paiement | Livré (adaptateur Airwallex prêt, en attente des clés) |
 | 5 | Admin | SQL prêt, interface à faire |
 | 6 | Google Business Profile (`GBP_ENABLED`) | À faire |
 | 7 | Finitions et checklist | À faire |
@@ -41,6 +41,19 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 et 2 livrées, phase 3 presqu
 - **Export CSV** (`/dashboard/export`) : en flux, heure de Malaisie.
 - **Connexion** : lien email, plus saisie du code à 6 chiffres si l'email est ouvert sur un autre appareil.
 - **Vérification des pages** (`npm run smoke:app`) : toutes les pages sont rendues contre une base locale (le vrai SQL), pour le patron, un second client, un nouveau login, l'admin et un visiteur.
+
+- **Résumé mensuel par email** (Resend) : envoyé le 1er du mois à 9 h (heure de Malaisie) aux clients qui ont au moins un lieu Pro. Scans, évolution par rapport au mois précédent, NFC / QR, meilleur jour, heure et jour de pointe, par plaque. Un client ne le reçoit qu'une fois par mois même si la tâche tourne plusieurs fois (`email_log`). Désactivable dans Compte.
+- **Cron Vercel** (`vercel.json`, une seule tâche par jour, compatible offre Hobby) : `/api/cron/daily` ferme les abonnements arrivés à échéance, efface les empreintes de dédoublonnage, envoie le résumé mensuel les premiers jours du mois. Protégé par `CRON_SECRET`.
+
+## Phase 4 — ce qui est fait
+
+- **Couche paiement** (`lib/payments/index.js`) : l'app ne connaît qu'une interface (ouvrir un paiement, vérifier un webhook, traduire un événement, arrêter / reprendre le renouvellement). Changer de fournisseur = écrire un adaptateur et changer `PAYMENT_PROVIDER`.
+- **Adaptateur Airwallex Billing** (`lib/payments/airwallex.js`) : page de paiement hébergée (mode abonnement), webhooks signés (HMAC-SHA256 sur horodatage + corps, refus au-delà de 5 minutes), renouvellement, échec de paiement (Pro maintenu pendant les relances), annulation, factures. Écrit d'après la documentation publique d'Airwallex Billing ; **à valider en sandbox dès que tu as les clés**.
+- **Webhook** : `/api/webhooks/airwallex`. Le Pro n'est accordé que par un événement signé (ou par la relecture serveur à serveur au retour du paiement), jamais par le navigateur. Un événement livré deux fois n'est appliqué qu'une fois ; un événement ancien n'écrase jamais un état plus récent.
+- **Page « Plan and payments »** (`/dashboard/billing`) : par lieu, passer en Pro mensuel ou annuel, annuler le renouvellement, le reprendre, voir les paiements et les factures. Tant que le paiement en ligne n'est pas ouvert, la page propose de nous écrire.
+- **Promesse du site respectée** : l'annulation ou la fin du Pro ne touche ni la plaque ni le Basic (testé).
+- **Emails de facturation** : Pro activé, paiement échoué (avec lien de la facture), Pro terminé.
+- `scripts/airwallex-setup.mjs` : crée le produit et les deux prix (RM29 / mois, RM290 / an) dans ton compte Airwallex et affiche les deux identifiants à mettre dans Vercel.
 
 ## Migrations SQL
 

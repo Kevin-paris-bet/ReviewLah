@@ -1,5 +1,7 @@
 // The checks run by scripts/app-smoke.mjs. One block per area of the app.
-export default async function checks({ page, get, check, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon }) {
+import { createHmac } from 'node:crypto';
+
+export default async function checks({ page, get, check, supabase, owner, other, newcomer, admin, bangsar, ttdi, salon, BASE, env }) {
   // Visitors
   let r = await get('/dashboard');
   check('a visitor is sent to the login page', r.status === 307 && r.location === '/login', `${r.status} ${r.location}`);
@@ -51,4 +53,46 @@ export default async function checks({ page, get, check, supabase, owner, other,
   check('CSV export of someone else\'s location is refused', r2.status === 404, `status ${r2.status}`);
   r2 = await get(`/dashboard/export?location=${bangsar.business_id}&days=7`);
   check('CSV export without login is refused', r2.status === 307 && r2.location.endsWith('/login'), `${r2.status} ${r2.location}`);
+
+  // Plan and payments
+  await page('plan page: Pro location and Basic location with both prices', '/dashboard/billing', owner,
+    ['Plan and payments', 'What Pro adds', 'switched on for you by the ReviewLah team', 'Get Pro yearly', 'Get Pro monthly', 'RM290', 'RM29', 'your plate and your Basic dashboard keep working']);
+  await page('plan page: Basic customer', '/dashboard/billing', other, ['Get Pro yearly', 'No payment yet']);
+  await page('plan page: login with no plate', '/dashboard/billing', newcomer, ['No plate is linked to this email yet'], ['Get Pro']);
+
+  const webhook = async (event, { secret = env.AIRWALLEX_WEBHOOK_SECRET, timestamp = String(Date.now()) } = {}) => {
+    const body = JSON.stringify(event);
+    const signature = createHmac('sha256', secret).update(`${timestamp}${body}`).digest('hex');
+    const response = await fetch(`${BASE}/api/webhooks/airwallex`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-timestamp': timestamp, 'x-signature': signature }, body });
+    return { status: response.status, json: await response.json().catch(() => ({})) };
+  };
+  const isPro = async (id) => (await supabase.db.query('select public.business_is_pro($1) as pro', [id])).rows[0].pro;
+  const subEvent = (id, name, status, extra = {}) => ({
+    id, name, created_at: new Date().toISOString(),
+    data: { object: { id: 'sub_smoke_1', status, billing_customer_id: 'bcus_smoke', recurring: { period: 1, period_unit: 'YEAR' },
+      current_period_starts_at: new Date().toISOString(), current_period_ends_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+      cancel_at_period_end: false, metadata: { business_id: ttdi.business_id }, ...extra } },
+  });
+  let w = await webhook(subEvent('evt_smoke_bad', 'subscription.active', 'ACTIVE'), { secret: 'wrong-secret' });
+  check('webhook with a wrong signature is refused and changes nothing', w.status === 401 && !(await isPro(ttdi.business_id)), `status ${w.status}`);
+  w = await webhook(subEvent('evt_smoke_old', 'subscription.active', 'ACTIVE'), { timestamp: String(Date.now() - 3600000) });
+  check('webhook replayed an hour later is refused', w.status === 401, `status ${w.status}`);
+  w = await fetch(`${BASE}/api/webhooks/unknown`, { method: 'POST', body: '{}' });
+  check('webhook for an unknown provider is a 404', w.status === 404, `status ${w.status}`);
+  w = await webhook(subEvent('evt_smoke_1', 'subscription.active', 'ACTIVE'));
+  check('signed webhook activates Pro for that location', w.status === 200 && w.json.outcome === 'applied' && (await isPro(ttdi.business_id)), `${w.status} ${JSON.stringify(w.json)}`);
+  w = await webhook(subEvent('evt_smoke_1', 'subscription.active', 'ACTIVE'));
+  check('the same webhook delivered twice is applied once', w.status === 200 && w.json.outcome === 'duplicate', `${w.status} ${JSON.stringify(w.json)}`);
+  w = await webhook({ id: 'evt_smoke_inv', name: 'invoice.paid', created_at: new Date().toISOString(),
+    data: { object: { id: 'inv_smoke_1', number: 'INV-0001', status: 'FINALIZED', payment_status: 'PAID', subscription_id: 'sub_smoke_1', currency: 'MYR', total_amount: 290, paid_at: new Date().toISOString(), hosted_url: 'https://example.com/invoice/inv_smoke_1' } } });
+  check('invoice webhook records the payment', w.status === 200 && w.json.outcome === 'applied', `${w.status} ${JSON.stringify(w.json)}`);
+  await page('plan page after payment: renewal date, cancel button, payment line', '/dashboard/billing', owner,
+    ['RM290 / year', 'Renews on', 'Cancel renewal', 'RM290', 'PAID', 'https://example.com/invoice/inv_smoke_1']);
+  await page('analytics unlocked for the newly paid location', `/dashboard/analytics?location=${ttdi.business_id}`, owner, ['Busiest hours']);
+  r = await get('/dashboard/billing', other);
+  check('another customer does not see these payments', r.status === 200 && !r.text.includes('inv_smoke_1'), `status ${r.status}`);
+  w = await webhook(subEvent('evt_smoke_2', 'subscription.cancelled', 'CANCELLED'));
+  check('cancellation webhook ends Pro; the plate still redirects', w.status === 200 && !(await isPro(ttdi.business_id)), `${w.status} ${JSON.stringify(w.json)}`);
+  r = await get(`/go/${ttdi.plates[0].code}?nfc`, null, { headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1', 'x-forwarded-for': '203.0.113.9' } });
+  check('plate of a location whose Pro ended still opens the Google review page', r.status === 302 && r.location === 'https://g.page/r/DEMO-TTDI/review', `${r.status} ${r.location}`);
 }
