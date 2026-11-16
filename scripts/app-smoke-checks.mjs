@@ -95,4 +95,30 @@ export default async function checks({ page, get, check, supabase, owner, other,
   check('cancellation webhook ends Pro; the plate still redirects', w.status === 200 && !(await isPro(ttdi.business_id)), `${w.status} ${JSON.stringify(w.json)}`);
   r = await get(`/go/${ttdi.plates[0].code}?nfc`, null, { headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1', 'x-forwarded-for': '203.0.113.9' } });
   check('plate of a location whose Pro ended still opens the Google review page', r.status === 302 && r.location === 'https://g.page/r/DEMO-TTDI/review', `${r.status} ${r.location}`);
+
+  // Admin
+  await page('admin overview with the all-in-one form', '/admin', admin, ['Overview', 'New customer, location and plates', 'Create customer, location and plates', 'Pro locations']);
+  r = await get('/admin', owner);
+  check('a customer cannot open the admin', r.status === 307 && r.location.includes('/dashboard'), `${r.status} ${r.location}`);
+  r = await get('/admin/customers', null);
+  check('a visitor is sent to the login page from the admin', r.status === 307 && r.location.includes('/login'), `${r.status} ${r.location}`);
+  await page('admin customers', '/admin/customers', admin, ['Kopi Corner Sdn Bhd', 'Salon Seri', 'aisha@kopicorner.my']);
+  await page('admin customers search', '/admin/customers?q=salon', admin, ['Salon Seri'], ['Kopi Corner Sdn Bhd']);
+  await page('admin customer page', `/admin/customers/${bangsar.company_id}`, admin,
+    ['Kopi Corner Bangsar', 'Kopi Corner TTDI', 'Manual Pro', 'Add a location', 'Customer details', 'go.reviewlah.my', 'Switch Pro off', 'History']);
+  await page('admin customer page shows the addresses of new plates', `/admin/customers/${bangsar.company_id}?ok=created&new=${bangsar.plates[0].code}`, admin,
+    ['program these addresses', `https://go.reviewlah.my/${bangsar.plates[0].code}?nfc`, `https://go.reviewlah.my/${bangsar.plates[0].code}?qr`]);
+  r = await get(`/admin/customers/${bangsar.company_id}`, owner);
+  check('a customer cannot open an admin customer page', r.status === 307, `status ${r.status}`);
+  await page('admin plates', '/admin/plates', admin, ['Address in the chip', bangsar.plates[0].code, 'Salon Seri Mont Kiara']);
+  await page('admin plans', '/admin/subscriptions', admin, ['Plans', 'Manual', 'Kopi Corner Bangsar']);
+  await page('admin support', '/admin/support', admin, ['My plate opens the page on Android', 'Mark as done', 'ben@salonseri.my']);
+  await page('admin system', '/admin/system', admin, ['SUPABASE_SECRET_KEY', 'AIRWALLEX_WEBHOOK_SECRET', '/api/webhooks/airwallex', 'Latest payment events', 'subscription.active'], ['dev-webhook-secret', 'dev-service']);
+
+  // Scheduled job
+  let c = await fetch(`${BASE}/api/cron/daily`);
+  check('the daily job refuses a call without the secret', c.status === 401, `status ${c.status}`);
+  c = await fetch(`${BASE}/api/cron/daily`, { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
+  const cron = await c.json().catch(() => ({}));
+  check('the daily job runs with the secret', c.status === 200 && cron.ok === true && cron.maintenance && !cron.maintenance.error, `${c.status} ${JSON.stringify(cron)}`);
 }

@@ -2,7 +2,7 @@
 
 Mis à jour à chaque étape. Pour reprendre dans une nouvelle conversation : « reprends depuis PROGRESS.md ».
 
-Dernière mise à jour : 17 nov. 2026 — phases 1 à 4 livrées côté code. Suite : admin (5), Google (6), finitions (7).
+Dernière mise à jour : 17 nov. 2026 — phases 1 à 5 livrées côté code. Suite : Google (6), finitions (7).
 
 ## Où on en est
 
@@ -12,7 +12,7 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 à 4 livrées côté code. Su
 | 2 | Dashboard Basic | Livré |
 | 3 | Dashboard Pro (hors Google) | Livré |
 | 4 | Abonnement et paiement | Livré (adaptateur Airwallex prêt, en attente des clés) |
-| 5 | Admin | SQL prêt, interface à faire |
+| 5 | Admin | Livré |
 | 6 | Google Business Profile (`GBP_ENABLED`) | À faire |
 | 7 | Finitions et checklist | À faire |
 
@@ -54,6 +54,13 @@ Dernière mise à jour : 17 nov. 2026 — phases 1 à 4 livrées côté code. Su
 - **Promesse du site respectée** : l'annulation ou la fin du Pro ne touche ni la plaque ni le Basic (testé).
 - **Emails de facturation** : Pro activé, paiement échoué (avec lien de la facture), Pro terminé.
 - `scripts/airwallex-setup.mjs` : crée le produit et les deux prix (RM29 / mois, RM290 / an) dans ton compte Airwallex et affiche les deux identifiants à mettre dans Vercel.
+
+## Phase 5 — ce qui est fait
+
+- `/admin` : chiffres clés et **un seul formulaire** pour créer entreprise + lieu + plaques (+ Pro manuel). Les codes et les deux adresses à programmer (NFC, QR) s'affichent sur la page suivante.
+- `/admin/customers` et la fiche client : lieux, plaques (pause, nom, déplacement, suppression si jamais scannée, ajout), lien Google, **Pro manuel on / off avec date de fin**, arrêt ou reprise d'un abonnement payé, coordonnées, email de connexion, notes internes, paiements, demandes de support, historique.
+- `/admin/plates`, `/admin/subscriptions`, `/admin/support`, `/admin/system` (quelles variables sont configurées, sans jamais afficher leur valeur ; derniers webhooks ; derniers emails).
+- Un non-admin est renvoyé vers son dashboard ; chaque fonction SQL revérifie le rôle admin.
 
 ## Migrations SQL
 
