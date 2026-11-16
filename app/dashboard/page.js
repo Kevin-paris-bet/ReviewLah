@@ -1,109 +1,131 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '../../lib/supabase/server';
-import { signOut } from '../actions';
+import { loadDashboard, plateName } from '../../lib/dashboard';
+import { timeAgo, formatDate } from '../../lib/time';
+import { PRO_FEATURES, PRO_PRICES } from '../../lib/plans';
+import { Flash, PlanBadge, Delta, Empty } from '../ui/parts';
+import { Icon } from '../ui/icons';
 
-export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Dashboard — ReviewLah.my' };
+export const metadata = { title: 'Overview' };
 
-const DAYS = 30;
-
-function Header({ email }) {
+function NoPlates({ email }) {
   return (
-    <div className="top">
-      <a className="logo" href="/">ReviewLah<span>.my</span></a>
-      <form action={signOut} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span className="muted">{email}</span>
-        <button className="btn out small" type="submit">Log out</button>
-      </form>
-    </div>
+    <Empty title="No plate is linked to this email yet">
+      <p>You are logged in as <strong>{email}</strong>. Your dashboard appears as soon as a plate is registered with this address.</p>
+      <p>Ordered with another email? Log out and log in with that one. Otherwise, <a href="/dashboard/help">contact us</a> and we link your plate.</p>
+    </Empty>
   );
 }
 
-export default async function Dashboard() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  await supabase.rpc('claim_plates');
-  const { data: plates } = await supabase.from('plates').select('*').eq('owner_id', user.id).order('created_at');
-
-  const since = new Date(Date.now() - DAYS * 86400000).toISOString();
-  const items = [];
-  for (const plate of plates || []) {
-    const { count } = await supabase.from('scans').select('*', { count: 'exact', head: true }).eq('plate_id', plate.id);
-    let days = null;
-    let nfc = 0;
-    let qr = 0;
-    if (plate.plan === 'pro') {
-      const { data: scans } = await supabase.from('scans').select('created_at, source').eq('plate_id', plate.id).gte('created_at', since).order('created_at').limit(20000);
-      const perDay = new Array(DAYS).fill(0);
-      for (const s of scans || []) {
-        const idx = DAYS - 1 - Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000);
-        if (idx >= 0 && idx < DAYS) perDay[idx] += 1;
-        if (s.source === 'nfc') nfc += 1;
-        else if (s.source === 'qr') qr += 1;
-      }
-      days = perDay;
-    }
-    items.push({ plate, total: count || 0, days, nfc, qr });
-  }
+export default async function Overview({ searchParams }) {
+  const sp = await searchParams;
+  const data = await loadDashboard();
+  const { businesses } = data;
+  const basic = businesses.filter((b) => !b.is_pro);
+  const many = businesses.length > 1;
 
   return (
     <>
-      <Header email={user.email} />
-      <div className="wrap">
-        <h1>Your business, at a glance.</h1>
-        <p className="muted">A scan means someone tapped or scanned your plate. It does not prove a review was posted.</p>
-
-        {items.length === 0 && (
-          <div className="card">
-            <h2>No plate linked to this email yet</h2>
-            <p className="muted">Use the same email address you gave us when you ordered. If you think this is a mistake, contact us.</p>
-          </div>
-        )}
-
-        {items.map(({ plate, total, days, nfc, qr }) => {
-          const max = days ? Math.max(1, ...days) : 1;
-          const channels = nfc + qr || 1;
-          return (
-            <div className="card" key={plate.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div>
-                  <h2 style={{ marginBottom: 4 }}>{plate.business_name}</h2>
-                  <span className={`badge ${plate.plan === 'pro' ? 'pro' : ''}`}>{plate.plan === 'pro' ? 'PRO' : 'BASIC'}</span>{' '}
-                  {!plate.active && <span className="badge off">PAUSED</span>}
-                </div>
-                <div className="muted">Plate code <code>{plate.code}</code></div>
-              </div>
-
-              <div className="stats" style={{ marginTop: 18 }}>
-                <div className="stat"><strong>{total}</strong><span className="muted">Total scans · all time</span></div>
-                {days && <div className="stat"><strong>{nfc}</strong><span className="muted">NFC taps · last {DAYS} days</span></div>}
-                {days && <div className="stat"><strong>{qr}</strong><span className="muted">QR scans · last {DAYS} days</span></div>}
-              </div>
-
-              {days ? (
-                <>
-                  <h2 style={{ marginTop: 24 }}>Scans per day · last {DAYS} days</h2>
-                  <div className="chart" role="img" aria-label={`Scans per day over the last ${DAYS} days`}>
-                    {days.map((n, i) => <i key={i} title={`${n}`} style={{ height: `${(n / max) * 100}%` }} />)}
-                  </div>
-                  <div style={{ marginTop: 18 }}>
-                    <div className="muted">NFC {Math.round((nfc / channels) * 100)}%</div>
-                    <div className="bar"><span style={{ width: `${(nfc / channels) * 100}%` }} /></div>
-                    <div className="muted">QR {Math.round((qr / channels) * 100)}%</div>
-                    <div className="bar"><span style={{ width: `${(qr / channels) * 100}%` }} /></div>
-                  </div>
-                </>
-              ) : (
-                <div className="note" style={{ marginTop: 18 }}>
-                  Want to see scans by day and NFC versus QR? That is ReviewLah Pro. Your plate keeps working with or without it.
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="page-head">
+        <div>
+          <h1>Your business, at a glance.</h1>
+          <p className="muted">A scan means someone tapped or scanned your plate. It does not prove that a review was posted.</p>
+        </div>
       </div>
+      <Flash sp={sp} />
+
+      {businesses.length === 0 && <NoPlates email={data.user.email} />}
+
+      {businesses.length > 0 && (
+        <div className="card">
+          <span className="muted">Total scans, all time{many ? ', all locations' : ''}</span>
+          <span className="num hero-num">{data.totalScans.toLocaleString('en-MY')}</span>
+          <span className="muted">
+            {data.lastScanAt ? `Last scan ${timeAgo(data.lastScanAt)}.` : 'No scan yet. Place your plate where customers pay or wait.'}
+            {many ? ` ${businesses.length} locations, ${data.plates.length} plates.` : data.plates.length > 1 ? ` ${data.plates.length} plates.` : ''}
+          </span>
+        </div>
+      )}
+
+      {businesses.map((b) => (
+        <section className="card" key={b.id} aria-label={b.name}>
+          <div className="card-head">
+            <div>
+              <h2>{b.name}</h2>
+              <PlanBadge pro={b.is_pro} />
+              {b.address && <span className="muted"> {b.address}</span>}
+            </div>
+            <a className="btn out small" href={`/dashboard/locations/${b.id}`}>Manage</a>
+          </div>
+
+          <div className={`stats ${b.is_pro ? 'three' : 'two'}`}>
+            <div className="stat">
+              <span className="label">Total scans, all time</span>
+              <span className="num">{Number(b.total_scans).toLocaleString('en-MY')}</span>
+              <span className="sub">{b.last_scan_at ? `Last scan ${timeAgo(b.last_scan_at)}` : 'No scan yet'}</span>
+            </div>
+            {b.is_pro && b.recent && (
+              <>
+                <div className="stat">
+                  <span className="label">Last 7 days</span>
+                  <span className="num">{b.recent.d7}</span>
+                  <span className="sub"><Delta current={b.recent.d7} previous={b.recent.d7_prev} /> vs the 7 days before</span>
+                </div>
+                <div className="stat">
+                  <span className="label">Last 30 days</span>
+                  <span className="num">{b.recent.d30}</span>
+                  <span className="sub"><Delta current={b.recent.d30} previous={b.recent.d30_prev} /> vs the 30 days before</span>
+                </div>
+              </>
+            )}
+            {!b.is_pro && (
+              <div className="stat">
+                <span className="label">Plates</span>
+                <span className="num">{b.plates.length}</span>
+                <span className="sub">{b.plates.filter((p) => p.active).length} active</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            {b.plates.map((p) => (
+              <div className="plate" key={p.id}>
+                <div className="who">
+                  <strong>{plateName(p)}</strong>
+                  <span className="muted">
+                    {!p.active && <span className="badge off">PAUSED</span>}{' '}
+                    {p.last_scan_at ? `Last scan ${timeAgo(p.last_scan_at)}` : `Registered ${formatDate(p.created_at)}`}
+                  </span>
+                </div>
+                <div className="count">
+                  <span className="num">{Number(p.total_scans).toLocaleString('en-MY')}</span>
+                  <span className="muted">scans</span>
+                </div>
+              </div>
+            ))}
+            {b.plates.length === 0 && <p className="muted">No plate registered for this location yet.</p>}
+          </div>
+
+          {b.is_pro ? (
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn small" href={`/dashboard/analytics?location=${b.id}`}><Icon name="chart" /> View analytics</a>
+              <a className="btn out small" href={`/dashboard/links?location=${b.id}`}><Icon name="link" /> Links page</a>
+            </div>
+          ) : null}
+        </section>
+      ))}
+
+      {basic.length > 0 && (
+        <section className="card blue" aria-label="ReviewLah Pro">
+          <span className="badge">OPTIONAL PRO</span>
+          <h2 style={{ marginTop: 10 }}>Want to see what is behind the scans?</h2>
+          <ul className="checks">
+            {PRO_FEATURES.slice(0, 4).map((f) => <li key={f}>{f}</li>)}
+          </ul>
+          <p className="muted">
+            {PRO_PRICES.month.short} or {PRO_PRICES.year.short} per location. Your plate works the same with or without it.
+          </p>
+          <a className="btn out small" href="/dashboard/billing">See what Pro adds</a>
+        </section>
+      )}
     </>
   );
 }

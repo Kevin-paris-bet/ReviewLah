@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "smoke:go": "node scripts/go-smoke.mjs"
+    "smoke:go": "node scripts/go-smoke.mjs",
+    "smoke:app": "node scripts/app-smoke.mjs",
+    "dev:supabase": "node scripts/dev-supabase.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

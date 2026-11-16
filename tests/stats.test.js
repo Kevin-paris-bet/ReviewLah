@@ -62,14 +62,21 @@ describe('scan statistics helpers', () => {
     expect(dayParts(new Array(24).fill(0)).every((p) => p.share === 0)).toBe(true);
   });
 
-  it('picks a readable chart maximum', () => {
+  it('picks a readable chart maximum whose quarter steps are whole numbers', () => {
     expect(niceMax([])).toBe(4);
     expect(niceMax([0, 3])).toBe(4);
-    expect(niceMax([7])).toBe(10);
+    expect(niceMax([7])).toBe(8);
+    expect(niceMax([9])).toBe(12);
     expect(niceMax([18])).toBe(20);
-    expect(niceMax([23])).toBe(25);
-    expect(niceMax([64])).toBe(100);
-    expect(niceMax([120])).toBe(200);
+    expect(niceMax([34])).toBe(40);
+    expect(niceMax([64])).toBe(80);
+    expect(niceMax([124])).toBe(160);
+    expect(niceMax([1000])).toBe(1000);
+    for (const value of [5, 9, 13, 21, 37, 55, 71, 99, 101, 250, 777, 1234, 9999]) {
+      const max = niceMax([value]);
+      expect(max).toBeGreaterThanOrEqual(value);
+      expect(Number.isInteger(max / 4), `${value} -> ${max}`).toBe(true);
+    }
   });
 
   it('averages scans per day', () => {

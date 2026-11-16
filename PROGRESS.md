@@ -2,15 +2,15 @@
 
 Mis à jour à chaque étape. Pour reprendre dans une nouvelle conversation : « reprends depuis PROGRESS.md ».
 
-Dernière mise à jour : 16 nov. 2026 — phase 1 livrée, phase 2 en cours.
+Dernière mise à jour : 17 nov. 2026 — phases 1 et 2 livrées, phase 3 presque finie (reste le résumé mensuel par email).
 
 ## Où on en est
 
 | Phase | Contenu | État |
 | --- | --- | --- |
 | 1 | Données et performances | Code livré. Migrations 0001–0004 à appliquer en production |
-| 2 | Dashboard Basic | En cours |
-| 3 | Dashboard Pro (hors Google) | À faire |
+| 2 | Dashboard Basic | Livré |
+| 3 | Dashboard Pro (hors Google) | Analytics, comparaison, page de liens, export CSV livrés. Reste : résumé mensuel par email |
 | 4 | Abonnement et paiement | SQL prêt, interface à faire |
 | 5 | Admin | SQL prêt, interface à faire |
 | 6 | Google Business Profile (`GBP_ENABLED`) | À faire |
@@ -27,6 +27,20 @@ Dernière mise à jour : 16 nov. 2026 — phase 1 livrée, phase 2 en cours.
 - **RLS** : aucun accès direct aux tables pour les visiteurs anonymes ; un patron ne lit que ses lignes ; toute écriture passe par des fonctions qui vérifient le propriétaire ; les lignes de scans ne sont lisibles que pour un lieu Pro.
 - **Tests** (`npm test`) : 111 tests. Les migrations tournent telles quelles sur un vrai PostgreSQL en mémoire (PGlite) : migration des données existantes, idempotence, compatibilité avec l'ancienne version de l'app, RLS, fuseau horaire, dédoublonnage, événements de paiement, admin.
 - **Test de bout en bout de `/go`** (`npm run smoke:go`) : contre une fausse API de base, y compris base en panne et serveur à froid.
+
+## Phases 2 et 3 — ce qui est fait
+
+- **Overview** (`/dashboard`) : tous les lieux et toutes les plaques, total des scans, dernier scan. Rappel permanent : un scan n'est pas un avis.
+- **Lieu** (`/dashboard/locations/<id>`) : le patron change lui-même le lien Google (validé côté app et côté base, appliqué à toutes les plaques du lieu), renomme ses plaques, modifie nom et adresse.
+- **Compte** (`/dashboard/account`) : nom, contact, téléphone, WhatsApp, préférences d'emails, changement d'email de connexion (confirmé par lien).
+- **Aide** (`/dashboard/help`) : FAQ, formulaire de support (enregistré en base et transmis à `SUPPORT_EMAIL`), WhatsApp.
+- **Upsell Pro** : un seul encart discret sur l'overview et un écran « ce que Pro ajoute » à la place des écrans Pro. Aucun chiffre Pro n'est calculé ni envoyé pour un lieu Basic.
+- **Analytics** (`/dashboard/analytics`) : 7 / 30 / 90 jours, par jour / semaine / mois, comparaison avec la période précédente, NFC / QR, heures et jours de pointe, par plaque.
+- **Comparaison** (`/dashboard/compare`) : lieux et plaques côte à côte.
+- **Page de liens** (`/dashboard/links`, publique sur `/l/<slug>`) : le bouton d'avis Google est toujours le premier, identique pour tout le monde.
+- **Export CSV** (`/dashboard/export`) : en flux, heure de Malaisie.
+- **Connexion** : lien email, plus saisie du code à 6 chiffres si l'email est ouvert sur un autre appareil.
+- **Vérification des pages** (`npm run smoke:app`) : toutes les pages sont rendues contre une base locale (le vrai SQL), pour le patron, un second client, un nouveau login, l'admin et un visiteur.
 
 ## Migrations SQL
 
