@@ -2,7 +2,7 @@
 
 Mis à jour à chaque étape. Pour reprendre dans une nouvelle conversation : « reprends depuis PROGRESS.md ».
 
-Dernière mise à jour : 17 nov. 2026 — les 7 phases sont livrées côté code. Il reste des actions de ta part (migrations, variables, clés Airwallex, accès Google) : voir la fin du fichier.
+Dernière mise à jour : 18 nov. 2026 — migrations appliquées en production ; les 7 phases sont livrées côté code. Il reste des actions de ta part (migrations, variables, clés Airwallex, accès Google) : voir la fin du fichier.
 
 ## Où on en est
 
@@ -88,11 +88,13 @@ Dans `supabase/migrations/`, à lancer dans l'ordre. Toutes sont idempotentes (r
 
 | Fichier | Contenu | En production |
 | --- | --- | --- |
-| `0001_core.sql` | entreprises, lieux, abonnements, dédoublonnage, RLS, `record_scan` | Non |
-| `0002_stats.sql` | statistiques en SQL, fuseau KL | Non |
-| `0003_owner_features.sql` | lien Google modifiable, compte, page de liens, support | Non |
-| `0004_billing_admin.sql` | paiements, webhooks, outils admin, maintenance | Non |
-| `0005_google.sql` | connexion Google, fiches liées, avis, brouillons (inutilisé tant que `GBP_ENABLED` est éteint) | Non |
+| `0001_core.sql` | entreprises, lieux, abonnements, dédoublonnage, RLS, `record_scan` | Oui (18 nov.) |
+| `0002_stats.sql` | statistiques en SQL, fuseau KL | Oui (18 nov.) |
+| `0003_owner_features.sql` | lien Google modifiable, compte, page de liens, support | Oui (18 nov.) |
+| `0004_billing_admin.sql` | paiements, webhooks, outils admin, maintenance | Oui (18 nov.) |
+| `0005_google.sql` | connexion Google, fiches liées, avis, brouillons (inutilisé tant que `GBP_ENABLED` est éteint) | Oui (18 nov.) |
+
+Appliquées en production le 18 nov. 2026 via les notebooks Supabase « ReviewLah — 01 » à « 05 ». Vérification (notebook « 06 ») : les 55 fonctions, les 20 règles de sécurité et les colonnes des 17 tables sont identiques, au caractère près, à la base testée localement. Ta plaque 64Y3N est rattachée à l'entreprise et au lieu « NoMoneyBet », ses 5 scans sont conservés, et son Pro manuel est actif. Copie de sauvegarde des tables d'origine dans le schéma privé `backup_20261116`.
 
 Sauvegarde avant migration : export complet des tables `plates`, `scans`, `admins` relu le 16 nov. 2026 (1 plaque, 5 scans, 1 admin), conservé dans le notebook Supabase « ReviewLah — table export before migration (read-only) ».
 
@@ -106,9 +108,7 @@ Sauvegarde avant migration : export complet des tables `plates`, `scans`, `admin
 
 ## Actions attendues de ta part
 
-1. **Appliquer les migrations** (priorité : tant que ce n'est pas fait, le dashboard affiche « We are updating your dashboard » ; la plaque, elle, redirige normalement). La demande de confirmation Supabase du 17 nov. est restée sans réponse. Deux façons :
-   - dire à Claude « applique les migrations » et accepter la confirmation Supabase qui s'affiche ;
-   - ou, dans Supabase > SQL Editor, lancer d'abord le notebook « ReviewLah — 00 backup before migration », puis coller et exécuter dans l'ordre `0001_core.sql`, `0002_stats.sql`, `0003_owner_features.sql`, `0004_billing_admin.sql`, `0005_google.sql`.
+1. ~~Appliquer les migrations~~ : fait le 18 nov. 2026.
 2. **Créer les variables d'environnement** du bloc 1 de `docs/ENVIRONMENT.md` dans Vercel, puis redéployer.
 3. **Supabase > Authentication** : vérifier que `https://www.reviewlah.my/auth/callback` et `https://www.reviewlah.my/auth/confirm` sont dans les Redirect URLs, et que le modèle d'email « Magic Link » contient bien le code `{{ .Token }}` si tu veux la saisie du code à 6 chiffres.
 4. **Dérouler `docs/TEST-CHECKLIST.md`** (parties A à D) avec ta plaque.
